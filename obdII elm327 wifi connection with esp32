@@ -1,0 +1,61 @@
+#include <WiFi.h>
+
+// ELM327 WiFi Configuration
+const char* obd2_ssid = "WIFI_OBDII";  // Your ELM327 WiFi SSID
+const char* obd2_password = "";        // No password by default (leave empty)
+const char* obd2_host = "192.168.0.11"; // ELM327 IP address
+const uint16_t obd2_port = 35000;      // ELM327 TCP port
+
+WiFiClient elm327Client;
+
+// Function Prototype
+void sendOBDCommand(String command);
+
+void setup() {
+    Serial.begin(115200);
+    Serial.println("Connecting to ELM327 WiFi...");
+
+    // Connect to ELM327 WiFi
+    WiFi.begin(obd2_ssid, obd2_password);
+    while (WiFi.status() != WL_CONNECTED) {
+        Serial.print(".");
+        delay(500);
+    }
+
+    Serial.println("\nConnected to ELM327!");
+    Serial.print("ESP32 IP: ");
+    Serial.println(WiFi.localIP());
+
+    // Connect to the ELM327 TCP Server
+    if (elm327Client.connect(obd2_host, obd2_port)) {
+        Serial.println("Connected to ELM327 TCP server.");
+        sendOBDCommand("ATZ");  // Reset ELM327
+        delay(1000);
+        sendOBDCommand("ATE0"); // Disable echo
+        delay(1000);
+        sendOBDCommand("010C"); // Request engine RPM
+        delay(1000);  // <-- You need this before closing the if statement
+    } else {
+        Serial.println("Failed to connect to ELM327.");
+    } // <-- Make sure this closes the if statement correctly
+} // <-- This properly closes setup()
+
+void loop() {
+    if (elm327Client.available()) {
+        String response = elm327Client.readStringUntil('\r');
+        Serial.print("ELM327 Response: ");
+        Serial.println(response);
+    }
+    delay(1000);
+}
+
+// Function to send OBD-II AT command
+void sendOBDCommand(String command) {
+    if (elm327Client.connected()) {
+        elm327Client.print(command + "\r"); // Send command with carriage return
+        Serial.print("Sent: ");
+        Serial.println(command);
+    } else {
+        Serial.println("ELM327 not connected.");
+    }
+}
